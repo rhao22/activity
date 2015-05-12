@@ -1,0 +1,98 @@
+---
+title: "Personal activity"
+author: "Rhao"
+date: "Thursday, May 07, 2015"
+output: html_document
+---
+
+```{r setup, cache = F, echo = F, message = F, warning = F, tidy = F}
+# make this an external chunk that can be included in any file
+library(knitr)
+options(width = 100)
+opts_chunk$set(message = F, error = F, warning = F, comment = NA, fig.align = 'center', 
+               dpi = 100, tidy = F, cache.path = '.cache/', fig.path = 'fig/')
+```
+
+
+#Introduction
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. 
+The project consists of building a machine learning algorithm to predict activity quality from activity monitors.
+
+#Getting data
+The data is read here and training and testing set are created
+```{r}
+library(caret)
+library(rattle)
+library(randomForest)
+
+alldata = read.csv("pml-training.csv")
+set.seed(32323)
+
+inTrain <- createDataPartition(y=alldata$classe,p=0.7, list=FALSE) 
+training <- alldata[inTrain,]
+testing <- alldata[-inTrain,]
+```
+
+
+#Cleaning up data
+Based on the summary of the data only colums that have useful values and create dataset with these columns
+```{r, results="hide"}
+dim(training)
+summary(training)
+list_of_cols <- c(
+  "roll_belt"          ,  "pitch_belt"          , "yaw_belt"            , "total_accel_belt",    
+  "gyros_belt_x"      ,   "gyros_belt_y"        , "gyros_belt_z"        , "accel_belt_x"    ,   
+  "accel_belt_y"      ,   "accel_belt_z"        , "magnet_belt_x"       , "magnet_belt_y"   ,    
+  "magnet_belt_z"     ,   "roll_arm"            , "pitch_arm"           , "yaw_arm"         ,    
+  "total_accel_arm"   ,   "gyros_arm_x"         , "gyros_arm_y"         , "gyros_arm_z"     ,    
+  "accel_arm_x"       ,   "accel_arm_y"         , "accel_arm_z"         , "magnet_arm_x"    ,    
+  "magnet_arm_y"      ,   "magnet_arm_z"        , "roll_dumbbell"       , "pitch_dumbbell"  ,    
+  "yaw_dumbbell"      ,   "total_accel_dumbbell", "gyros_dumbbell_x"    , "gyros_dumbbell_y",    
+  "gyros_dumbbell_z"  ,   "accel_dumbbell_x"    , "accel_dumbbell_y"    , "accel_dumbbell_z",    
+  "magnet_dumbbell_x" ,   "magnet_dumbbell_y"   , "magnet_dumbbell_z"   , "roll_forearm"    ,    
+  "pitch_forearm"     ,   "yaw_forearm"         , "total_accel_forearm" , "gyros_forearm_x" ,    
+  "gyros_forearm_y"   ,   "gyros_forearm_z"     , "accel_forearm_x"     , "accel_forearm_y" ,   
+  "accel_forearm_z"   ,   "magnet_forearm_x"    , "magnet_forearm_y"    , "magnet_forearm_z");    
+testingclean <- testing[ , which(names(testing) %in% list_of_cols)] 
+trainingclean <- training[ , which(names(training) %in% list_of_cols)] 
+
+```
+
+#Run different models
+##Model 1 Tree
+```{r}
+modelFit1 <- train(training$classe ~ ., data=trainingclean, method="rpart")
+modelFit1
+fancyRpartPlot(modelFit1$finalModel)
+```
+
+##Model 2 Random Forest
+```{r}
+modelFit2  <-randomForest(training$classe ~ ., 
+                   data=trainingclean, 
+                   prox=TRUE, 
+                   ntree=20, 
+                   tuneGrid = data.frame(mtry = 3))
+
+modelFit2
+head(getTree(modelFit2,k=2))
+varImpPlot(modelFit2)
+```
+
+#Predict testing values and getting accuracy
+```{r}
+confusionMatrix(testing$classe,predict(modelFit1,testingclean))
+confusionMatrix(testing$classe,predict(modelFit2,testingclean))
+print("Accuracy for model 1:")
+res1 <- confusionMatrix(testing$classe,predict(modelFit1,testingclean))
+res1$overall[1]
+print("Accuracy for model 1:")
+res2 <- confusionMatrix(testing$classe,predict(modelFit2,testingclean))
+res2$overall[1]
+```
+
+#Conclusion 
+The second model done with random forest should used as it's accuracy is very high: `r I(res2$overall[1])` It is
+a great machine learning algorithm to predict activity quality from activity monitors.
+
+
